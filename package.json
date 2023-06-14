@@ -1,0 +1,40 @@
+{
+    "name": "raxis-plugin-graphics",
+    "version": "0.2.7",
+    "description": "Graphics plugin for the Raxis ECS",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "format": "prettier --write \"src/**/*.(js|ts)\"",
+        "test": "jest --config jest.config.js",
+        "prepare": "npm run build",
+        "prepublishOnly": "npm test",
+        "version": "npm run format && git add -A src",
+        "postversion": "git push && git push --tags"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/xxx/xxx.git"
+    },
+    "keywords": [],
+    "author": "Jonster5",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/xxx/xxx/issues"
+    },
+    "homepage": "https://github.com/xxx/xxx#readme",
+    "devDependencies": {
+        "@types/jest": "^29.5.2",
+        "jest": "27.4.7",
+        "prettier": "2.5.1",
+        "ts-jest": "27.1.3",
+        "typescript": "4.5.5"
+    },
+    "files": [
+        "dist/**/*"
+    ],
+    "dependencies": {
+        "raxis-core": "^0.2.8"
+    }
+}
