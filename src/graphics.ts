@@ -1,102 +1,14 @@
-import { ECS, ECSPlugin, Vec2 } from 'raxis-core';
-import { Time } from './time';
+import { ECS, ECSPlugin, EntityControls, Vec2 } from 'raxis-core';
+import { Time, TimeData } from 'raxis-plugin-time';
+import { Transform } from 'raxis-plugin-transform';
 import { TreeNode } from './treenode';
-
-export class GraphicsSettings {
-    constructor(
-        public settings: {
-            target: HTMLElement;
-            width: number;
-            rendering?: 'crisp-edges' | 'pixelated';
-        },
-    ) {}
-}
-
-export class Canvas {
-    constructor(
-        public target: HTMLElement,
-        public element: HTMLCanvasElement,
-        public ctx: CanvasRenderingContext2D,
-        public aspect: number,
-        public size: Vec2,
-        public def: DOMMatrix,
-        public root: number | null,
-    ) {}
-}
-
-export class RenderData {
-    constructor(
-        public ups: number = 30,
-        public lagOffset: number = 0,
-        public last: number = 0,
-        public lag: number = 0,
-    ) {}
-}
-
-export class Root {}
-
-export class Sprite {
-    constructor(
-        public type: 'rectangle' | 'ellipse' | 'image' | 'none',
-        public material:
-            | string
-            | CanvasGradient
-            | CanvasPattern
-            | HTMLImageElement[]
-            | undefined = undefined,
-        public visible: boolean = true,
-        public filter: string = 'none',
-        public alpha: number = 1,
-        public borderColor: string = 'none',
-        public borderWidth: number = 0,
-
-        public shifter: number | undefined = undefined,
-        public delay: number | undefined = 100,
-        public ci: number | undefined = 0,
-    ) {}
-}
-
-function setupCanvas(ecs: ECS) {
-    const { target, width, rendering } = (
-        ecs.getResource(GraphicsSettings) as GraphicsSettings
-    ).settings;
-
-    const element = document.createElement('canvas');
-    const ctx = element.getContext('2d')!;
-
-    const dpr = window.devicePixelRatio ?? 1;
-
-    const aspect = window.innerHeight / window.innerWidth;
-
-    const size = new Vec2(width, width * aspect);
-
-    element.width = size.x * dpr;
-    element.height = size.y * dpr;
-    ctx.transform(dpr, 0, 0, -dpr, element.width / 2, element.height / 2);
-
-    const def = ctx.getTransform();
-
-    element.setAttribute(
-        'style',
-        `display: block; width: 100%; height: 100%; border: none; background: transparent; image-rendering: ${
-            rendering ?? 'crisp-edges'
-        }`,
-    );
-
-    element.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    target.appendChild(element);
-
-    const root = ecs
-        .entity()
-        .add(new Sprite('none'), new Transform(), new TreeNode(), new Root());
-
-    const canvas = ecs
-        .entity()
-        .add(new Canvas(target, element, ctx, aspect, size, def, root.id()));
-
-    root.getComponent(TreeNode).parent = canvas.id();
-}
+import {
+    Canvas,
+    updateCanvasZoom,
+    setupCanvas,
+    updateCanvasDimensions,
+} from './canvas';
+import { Sprite, Root } from './sprite';
 
 function render(ecs: ECS) {
     const canvas: Canvas = ecs.queryComponents(Canvas)[0];
@@ -227,7 +139,7 @@ export function startImageAnimation(sprite: Sprite, delay: number) {
         sprite.ci!++;
         if (sprite.ci! >= (sprite.material as HTMLImageElement[]).length)
             sprite.ci! = 0;
-    }, delay);
+    }, delay) as unknown as number;
 }
 
 export function stopImageAnimation(sprite: Sprite) {
@@ -239,9 +151,38 @@ export function gotoImageFrame(sprite: Sprite, index: number) {
     sprite.ci = index;
 }
 
+export function globalPos(entity: EntityControls): Vec2 {
+    const [node, t] = entity.get(TreeNode, Transform);
+
+    if (node.parent) {
+        return globalPos(entity.ecs().controls(node.parent)).add(t.pos);
+    } else {
+        return new Vec2(0, 0);
+    }
+}
+
+function checkGraphicsCompatibility(ecs: ECS) {
+    const hasTime = !!ecs.getResource(Time);
+    const hasTimeData = !!ecs.getResource(TimeData);
+
+    const hasTransform = ecs.hasComponent(Transform);
+
+    if (!hasTime || !hasTimeData) {
+        throw new Error(
+            `raxis-plugin-graphics requires plugin [raxis-plugin-time]`,
+        );
+    }
+
+    if (!hasTransform) {
+        throw new Error(
+            `raxis-plugin-graphics requires plugin [raxis-plugin-transform]`,
+        );
+    }
+}
+
 export const GraphicsPlugin: ECSPlugin = {
-    components: [Canvas, Transform, TreeNode, Sprite, Root],
-    startup: [setupCanvas],
-    systems: [render, updateTransform],
-    resources: [new GameSettings(1)],
+    components: [Canvas, TreeNode, Sprite, Root],
+    startup: [checkGraphicsCompatibility, setupCanvas],
+    systems: [updateCanvasDimensions, updateCanvasZoom, render],
+    resources: [],
 };
